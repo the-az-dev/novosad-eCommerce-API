@@ -1,0 +1,109 @@
+<select id="subcategory">
+    <option value="">Оберіть підкатегорію</option>
+    {% for sub in subcategories %}
+    <option value="{{ sub.id }}">{{ sub.name }}</option>
+    {% endfor %}
+  </select>
+  
+  <div id="filters-container">
+    <form id="filters-form">
+      <div id="filters"></div>
+      <button type="submit">Застосувати</button>
+    </form>
+  </div>
+  
+  <div id="products-container">
+    <h2>Товари</h2>
+    <div id="products"></div>
+  </div>
+  
+  <script>
+    document.addEventListener("DOMContentLoaded", function () {
+        let subcategorySelect = document.getElementById("subcategory");
+        let filtersContainer = document.getElementById("filters");
+        let filtersForm = document.getElementById("filters-form");
+        let productsContainer = document.getElementById("products");
+  
+        // Оновлення фільтрів при виборі підкатегорії
+        subcategorySelect.addEventListener("change", function () {
+            let subcategoryId = this.value;
+            filtersContainer.innerHTML = "";
+            productsContainer.innerHTML = ""; // Очистити список товарів
+  
+            if (!subcategoryId) return;
+  
+            fetch(`/products/get-filters/?subcategory=${subcategoryId}`)
+                .then(response => response.json())
+                .then(data => {
+                    data.data.forEach(filter => {
+                        let filterElement = document.createElement("div");
+                        filterElement.innerHTML = `<label>${filter.name}</label>`;
+  
+                        switch (filter.type) {
+                            case "select":
+                                let select = document.createElement("select");
+                                select.name = `filter_${filter.id}`;
+                                select.innerHTML = `<option value="">Оберіть</option>`;
+                                filter.values.forEach(value => {
+                                    let option = document.createElement("option");
+                                    option.value = value;
+                                    option.textContent = value;
+                                    select.appendChild(option);
+                                });
+                                filterElement.appendChild(select);
+                                break;
+                            case "number":
+                                filterElement.innerHTML += `<input type="number" name="filter_${filter.id}">`;
+                                break;
+                            case "text":
+                                filterElement.innerHTML += `<input type="text" name="filter_${filter.id}">`;
+                                break;
+                            case "number_range":
+                                filterElement.innerHTML += `
+                                    <input type="number" name="filter_${filter.id}_min" placeholder="Мін">
+                                    <input type="number" name="filter_${filter.id}_max" placeholder="Макс">
+                                `;
+                                break;
+                        }
+                        filtersContainer.appendChild(filterElement);
+                    });
+                });
+        });
+  
+        // Обробка фільтрів і отримання товарів
+        filtersForm.addEventListener("submit", function (event) {
+            event.preventDefault();
+            let subcategoryId = subcategorySelect.value;
+            if (!subcategoryId) return;
+  
+            let formData = new FormData(filtersForm);
+            let params = new URLSearchParams();
+            params.append("subcategory_id", subcategoryId);
+  
+            for (let [key, value] of formData.entries()) {
+                if (value) params.append(key, value);
+            }
+  
+            fetch(`/products/filter-products/?${params.toString()}`)
+                .then(response => response.json())
+                .then(data => {
+                    productsContainer.innerHTML = "";
+                    if (data.products.length === 0) {
+                        productsContainer.innerHTML = "<p>Немає товарів за заданими фільтрами.</p>";
+                        return;
+                    }
+                    data.products.forEach(product => {
+                        let productElement = document.createElement("div");
+                        productElement.classList.add("product-item");
+                        productElement.innerHTML = `
+                            <img src="${product.photo_url}" alt="${product.name}" style="width:100px;">
+                            <h3>${product.name}</h3>
+                            <p>Ціна: ${product.price} грн</p>
+                        `;
+                        productsContainer.appendChild(productElement);
+                    });
+                });
+        });
+    });
+  </script>
+  
